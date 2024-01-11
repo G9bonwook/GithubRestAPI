@@ -16,6 +16,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -39,18 +40,19 @@ public class GitHubService {
         headers.set("Authorization", "Bearer " + githubToken);
 
         URI uri = UriComponentsBuilder.fromUriString(githubApiUrl)
-                .path("/users/"+ owner + "/repos")
+                .path("/users/" + owner + "/repos")
                 .buildAndExpand(owner)
                 .toUri();
 
         RequestCallback requestCallback = request -> request.getHeaders().addAll(headers);
 
-        ResponseExtractor<ResponseEntity<List>> responseExtractor = restTemplate.responseEntityExtractor(List.class);
+        ResponseExtractor<ResponseEntity<String>> responseExtractor = restTemplate.responseEntityExtractor(String.class);
 
-        ResponseEntity<List> responseEntity = restTemplate.execute(uri, HttpMethod.GET, requestCallback, responseExtractor);
+        ResponseEntity<String> responseEntity = restTemplate.execute(uri, HttpMethod.GET, requestCallback, responseExtractor);
 
         if (responseEntity.getStatusCode().is2xxSuccessful()) {
-            String responseBody = responseEntity.getBody().toString();
+            String responseBody = responseEntity.getBody();
+            System.out.println("Response Body: " + responseBody);
             List<String> repositoryNames = extractRepositoryNamesFromJson(responseBody);
             return repositoryNames;
         } else {
@@ -62,9 +64,10 @@ public class GitHubService {
     private List<String> extractRepositoryNamesFromJson(String json) {
         try {
             ObjectMapper objectMapper = new ObjectMapper();
-            List<GithubRepository> repositories = objectMapper.readValue(json, new TypeReference<List<GithubRepository>>() {});
+            List<Map<String, Object>> repositories = objectMapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {});
+
             return repositories.stream()
-                    .map(GithubRepository::getName)
+                    .map(repo -> (String) repo.get("name"))
                     .collect(Collectors.toList());
         } catch (Exception e) {
             // Handle JSON parsing exception
